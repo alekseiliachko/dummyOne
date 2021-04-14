@@ -58,13 +58,15 @@ public class QueueAdapterImpl implements QueueAdapter{
             initRequest.setRemoteKey(REMOTE_KEY);
             ResponseEntity<String> responseEntity = restTemplate.postForEntity(URI_REG, initRequest, String.class);
 
-            if (!HttpStatus.OK.equals(responseEntity.getStatusCode()))
+            if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
                 throw new QueueMessageBrokerException();
+            }
 
             TOKEN = responseEntity.getBody();
 
             log.info("logged in with and assigned token: " + TOKEN);
         } catch (Exception e) {
+            e.printStackTrace();
             log.error("FAILED TO INSTANTIATE QUEUE ADAPTER");
 //            throw new QueueMessageBrokerException();
         }
