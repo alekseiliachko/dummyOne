@@ -4,15 +4,18 @@ import com.example.dummyOne.queuepackage.config.QueueConfig;
 import com.example.dummyOne.queuepackage.dto.InitRequest;
 import com.example.dummyOne.queuepackage.excpetion.QueueMessageBrokerException;
 import com.example.dummyOne.queuepackage.dto.Message;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.example.dummyOne.queuepackage.config.QueueConfig.*;
 
 @Slf4j
 @Component
@@ -20,42 +23,25 @@ public class QueueAdapterImpl implements QueueAdapter{
 
     private final RestTemplate restTemplate;
 
-    // imagine value here
-    static String REMOTE_NAME = "http://localhost:8001/";
+    private String TOKEN = null;
 
-    // imagine value here
-    static String REMOTE_PASS = "password";
+    private final ObjectMapper objectMapper;
 
-    // imagine value here
-    static String REMOTE_KEY = "secretKey";
-
-    static String TOKEN = null;
-
-    private static URI URI_REG;
-    private static URI URI_SUB;
-    private static URI URI_MES;
-
-    static {
-        try {
-            URI_REG = new URI(QueueConfig.QUEUE_BASE_URL_PATH + QueueConfig.QUEUE_REGISTER_PATH);
-            URI_MES = new URI(QueueConfig.QUEUE_BASE_URL_PATH + QueueConfig.QUEUE_MESSAGE_PATH);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public QueueAdapterImpl(RestTemplate restTemplate) {
+    public QueueAdapterImpl(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
-        this.registerWithKey(REMOTE_KEY);
+        this.objectMapper = objectMapper;
     };
 
     @Override
-    public void registerWithKey(String key) {
+    public void registerWithKey() {
         try {
             InitRequest initRequest = new InitRequest();
-            initRequest.setRemoteName(REMOTE_NAME);
+            initRequest.setRemoteName(THIS_BASE_URL_PATH);
             initRequest.setRemotePass(REMOTE_PASS);
             initRequest.setRemoteKey(REMOTE_KEY);
+
+            URI URI_REG = new URI(QueueConfig.QUEUE_BASE_URL_PATH + QueueConfig.QUEUE_REGISTER_PATH);
+
             ResponseEntity<String> responseEntity = restTemplate.postForEntity(URI_REG, initRequest, String.class);
 
             if (!HttpStatus.OK.equals(responseEntity.getStatusCode())) {
@@ -64,10 +50,9 @@ public class QueueAdapterImpl implements QueueAdapter{
 
             TOKEN = responseEntity.getBody();
 
-            log.info("logged in with and assigned token: " + TOKEN);
+            log.info(" ... successfully logged in ... ");
         } catch (Exception e) {
-            e.printStackTrace();
-            log.error("FAILED TO INSTANTIATE QUEUE ADAPTER");
+            log.error(" ... failed to log in ... ");
 //            throw new QueueMessageBrokerException();
         }
     }
@@ -75,8 +60,8 @@ public class QueueAdapterImpl implements QueueAdapter{
     @Override
     public void subscribe(String topic) {
         try {
-            URI_SUB = new URI(QueueConfig.QUEUE_BASE_URL_PATH + QueueConfig.QUEUE_SUBSCRIPTION_PATH + topic + "/");
-            ResponseEntity<String> responseEntity = restTemplate.postForEntity(URI_REG, new Object(), String.class);
+            URI URI_SUB = new URI(QueueConfig.QUEUE_BASE_URL_PATH + QueueConfig.QUEUE_SUBSCRIPTION_PATH + topic + "/");
+            ResponseEntity<String> responseEntity = restTemplate.postForEntity(URI_SUB, getEntity(), String.class);
             if (!HttpStatus.OK.equals(responseEntity.getStatusCode()))
                 throw new QueueMessageBrokerException();
 
@@ -89,7 +74,9 @@ public class QueueAdapterImpl implements QueueAdapter{
     @Override
     public void sendMessage(Message message) {
         try {
-            ResponseEntity<String> responseEntity = restTemplate.postForEntity(URI_MES, message, String.class);
+            URI URI_MES = new URI(QueueConfig.QUEUE_BASE_URL_PATH + QueueConfig.QUEUE_MESSAGE_PATH);
+
+            ResponseEntity<String> responseEntity = restTemplate.postForEntity(URI_MES, getEntity(message), String.class);
             if (!HttpStatus.OK.equals(responseEntity.getStatusCode()))
                 throw new QueueMessageBrokerException();
 
@@ -97,5 +84,23 @@ public class QueueAdapterImpl implements QueueAdapter{
         } catch (Exception e) {
             throw new QueueMessageBrokerException();
         }
+    }
+
+    private HttpEntity<String> getEntity(Message message) throws JsonProcessingException {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer "+ TOKEN);
+
+        String json = objectMapper.writeValueAsString(message);
+
+        return new HttpEntity<String>(json,headers);
+    }
+
+    private HttpEntity<String> getEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer "+ TOKEN);
+
+        return new HttpEntity<String>(headers);
     }
 }

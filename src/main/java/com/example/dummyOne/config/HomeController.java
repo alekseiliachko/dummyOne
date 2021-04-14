@@ -1,4 +1,4 @@
-package com.example.dummyOne.controller;
+package com.example.dummyOne.config;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class HomeController {
 
     @RequestMapping("/")
-    public ResponseEntity<String> index() {
-        return ResponseEntity.ok("hello world");
+    public String index() {
+        return "redirect:swagger-ui.html";
     }
 }
